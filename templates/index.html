@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FANTASTURK - Futbol Tahmin Sistemi</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10">
+                <div class="text-center mb-5 logo-container">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="FANTASTURK" class="logo-image mb-3">
+                    <h1>FANTASTURK - Futbol Tahmin Sistemi</h1>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-body p-4">
+                        <form method="POST">
+                            <div class="row align-items-end">
+                                <div class="col-md-5">
+                                    <div class="form-group mb-0">
+                                        <label for="home_team" class="mb-2">Ev Sahibi Takım</label>
+                                        <select class="form-select form-select-lg" name="home_team" id="home_team" onchange="updateTeamSelections()" required>
+                                            <option value="">Seçiniz...</option>
+                                            {% for team in teams %}
+                                            <option value="{{ team }}" {% if home_team == team %}selected{% endif %}>{{ team }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-2">
+                                    <div class="text-center mb-0">
+                                        <span class="display-6 text-muted">VS</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-5">
+                                    <div class="form-group mb-0">
+                                        <label for="away_team" class="mb-2">Deplasman Takımı</label>
+                                        <select class="form-select form-select-lg" name="away_team" id="away_team" onchange="updateTeamSelections()" required>
+                                            <option value="">Seçiniz...</option>
+                                            {% for team in teams %}
+                                            <option value="{{ team }}" {% if away_team == team %}selected{% endif %}>{{ team }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg px-5" id="submitBtn">
+                                    <span class="d-inline-block">Tahmin Yap</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                
+                <!-- JavaScript -->
+                <script>
+                function formatDate(dateStr) {
+                    const date = new Date(dateStr);
+                    const day = date.getDate().toString().padStart(2, '0');
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                }
+
+                function updateTeamSelections() {
+                    const homeSelect = document.getElementById('home_team');
+                    const awaySelect = document.getElementById('away_team');
+                    const submitBtn = document.getElementById('submitBtn');
+                    
+                    // Tüm seçenekleri aktif et
+                    Array.from(homeSelect.options).forEach(option => {
+                        option.disabled = false;
+                    });
+                    Array.from(awaySelect.options).forEach(option => {
+                        option.disabled = false;
+                    });
+                    
+                    // Seçili takımları diğer listede devre dışı bırak
+                    if (homeSelect.value) {
+                        const selectedOption = Array.from(awaySelect.options).find(
+                            option => option.value === homeSelect.value
+                        );
+                        if (selectedOption) {
+                            selectedOption.disabled = true;
+                        }
+                    }
+                    
+                    if (awaySelect.value) {
+                        const selectedOption = Array.from(homeSelect.options).find(
+                            option => option.value === awaySelect.value
+                        );
+                        if (selectedOption) {
+                            selectedOption.disabled = true;
+                        }
+                    }
+                    
+                    // Aynı takım seçilmişse submit butonunu devre dışı bırak
+                    if (homeSelect.value && awaySelect.value) {
+                        submitBtn.disabled = homeSelect.value === awaySelect.value;
+                    }
+                }
+
+                // Sayfa yüklendiğinde kontrolleri ve tarih formatlamalarını çalıştır
+                document.addEventListener('DOMContentLoaded', function() {
+                    updateTeamSelections();
+                    
+                    // Tüm tarih hücrelerini formatla
+                    document.querySelectorAll('td:first-child').forEach(td => {
+                        if (td.textContent.includes('-')) {  // Tarih içeriyorsa
+                            td.textContent = formatDate(td.textContent);
+                        }
+                    });
+                });
+                </script>
+                
+                {% if predictions %}
+                <div class="card">
+                    <div class="card-body p-4">
+                        <h5 class="card-title text-center mb-4">Tahmin Sonuçları</h5>
+                        
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="prediction-section">
+                                    <h6 class="mb-3">Maç Sonucu</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span class="result-text">
+                                                <i class="fas fa-trophy text-warning me-2"></i>
+                                                {{ home_team }} Kazanır
+                                            </span>
+                                            <span class="badge bg-primary rounded-pill">{{ predictions.match_result.home_win }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span class="result-text">
+                                                <i class="fas fa-handshake text-info me-2"></i>
+                                                Beraberlik
+                                            </span>
+                                            <span class="badge bg-primary rounded-pill">{{ predictions.match_result.draw }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span class="result-text">
+                                                <i class="fas fa-trophy text-warning me-2"></i>
+                                                {{ away_team }} Kazanır
+                                            </span>
+                                            <span class="badge bg-primary rounded-pill">{{ predictions.match_result.away_win }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="prediction-section">
+                                    <h6 class="mb-3">Diğer Tahminler</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Tahmini Skor</span>
+                                            <span class="badge bg-success rounded-pill">{{ predictions.score }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>İY/MS</span>
+                                            <span class="badge bg-info rounded-pill">{{ predictions.iy_ms }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>KG</span>
+                                            <span class="badge bg-warning rounded-pill">{{ predictions.kg }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- İstatistikler -->
+                        <div class="mt-4">
+                            <h6 class="mb-3">Temel İstatistikler</h6>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>İstatistik</th>
+                                            <th>{{ home_team }}</th>
+                                            <th>{{ away_team }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Maç Sonu Gol Ort.</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['MS Gol Ort']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['MS Gol Ort']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>İlk Yarı Gol Ort.</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['İY Gol Ort']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['İY Gol Ort']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Topla Oynama (%)</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['Topla Oynama']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['Topla Oynama']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Pas İsabeti (%)</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['Pas İsabeti']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['Pas İsabeti']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Toplam Şut</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['Toplam Şut']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['Toplam Şut']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>İsabetli Şut</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['İsabetli Şut']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['İsabetli Şut']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Gol Beklentisi (xG)</td>
+                                            <td>{{ "%.2f"|format(predictions.stats.home['Gol Beklentisi']) }}</td>
+                                            <td>{{ "%.2f"|format(predictions.stats.away['Gol Beklentisi']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Ceza Sahası Etkinliği</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['Ceza Sahası Etkinliği']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['Ceza Sahası Etkinliği']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>İkili Mücadele</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['İkili Mücadele']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['İkili Mücadele']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Hava Topu</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['Hava Topu']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['Hava Topu']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Pas Arası</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.home['Pas Arası']) }}</td>
+                                            <td>{{ "%.1f"|format(predictions.stats.away['Pas Arası']) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Son 5 Maç Galibiyet</td>
+                                            <td>{{ predictions.stats.home['Galibiyet'] }}</td>
+                                            <td>{{ predictions.stats.away['Galibiyet'] }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Son 5 Maç Mağlubiyet</td>
+                                            <td>{{ predictions.stats.home['Mağlubiyet'] }}</td>
+                                            <td>{{ predictions.stats.away['Mağlubiyet'] }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Son 5 Maç Puan</td>
+                                            <td>{{ predictions.stats.home['Puan'] }}</td>
+                                            <td>{{ predictions.stats.away['Puan'] }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Form Değerlendirmesi -->
+                        <div class="mt-4">
+                            <h6 class="mb-3">Form Değerlendirmesi</h6>
+                            
+                            <!-- Son Karşılaşmalar -->
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Son Karşılaşmalar</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if predictions.matches.h2h %}
+                                        <div class="table-responsive">
+                                            <table class="table table-dark table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Tarih</th>
+                                                        <th>Ev Sahibi</th>
+                                                        <th>Skor</th>
+                                                        <th>Deplasman</th>
+                                                        <th>Sonuç</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for match in predictions.matches.h2h %}
+                                                    <tr>
+                                                        <td class="match-date">{{ match.date }}</td>
+                                                        <td>{{ match.home_team }}</td>
+                                                        <td>{{ match.score }}</td>
+                                                        <td>{{ match.away_team }}</td>
+                                                        <td>
+                                                            {% if match.result == 'Ev Sahibi Galip' %}
+                                                                <i class="fas fa-home text-success me-1"></i>
+                                                            {% elif match.result == 'Beraberlik' %}
+                                                                <i class="fas fa-handshake text-warning me-1"></i>
+                                                            {% else %}
+                                                                <i class="fas fa-plane text-info me-1"></i>
+                                                            {% endif %}
+                                                            {{ match.result }}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="mb-0">İki takım arasında geçmiş karşılaşma bulunamadı.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Ev Sahibi Son Maçlar -->
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ home_team }} Son 5 Maç</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Tarih</th>
+                                                    <th>Rakip</th>
+                                                    <th>Saha</th>
+                                                    <th>Skor</th>
+                                                    <th>Sonuç</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for match in predictions.matches.home_last %}
+                                                <tr>
+                                                    <td class="match-date">{{ match.date }}</td>
+                                                    <td>{{ match.opponent }}</td>
+                                                    <td>{{ 'Ev' if match.is_home else 'Dep' }}</td>
+                                                    <td>{{ match.score }}</td>
+                                                    <td>
+                                                        {% if match.result == 'Galibiyet' %}
+                                                            <i class="fas fa-check-circle text-success me-1"></i>
+                                                        {% elif match.result == 'Beraberlik' %}
+                                                            <i class="fas fa-minus-circle text-warning me-1"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-times-circle text-danger me-1"></i>
+                                                        {% endif %}
+                                                        {{ match.result }}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Deplasman Son Maçlar -->
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ away_team }} Son 5 Maç</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Tarih</th>
+                                                    <th>Rakip</th>
+                                                    <th>Saha</th>
+                                                    <th>Skor</th>
+                                                    <th>Sonuç</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for match in predictions.matches.away_last %}
+                                                <tr>
+                                                    <td class="match-date">{{ match.date }}</td>
+                                                    <td>{{ match.opponent }}</td>
+                                                    <td>{{ 'Ev' if match.is_home else 'Dep' }}</td>
+                                                    <td>{{ match.score }}</td>
+                                                    <td>
+                                                        {% if match.result == 'Galibiyet' %}
+                                                            <i class="fas fa-check-circle text-success me-1"></i>
+                                                        {% elif match.result == 'Beraberlik' %}
+                                                            <i class="fas fa-minus-circle text-warning me-1"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-times-circle text-danger me-1"></i>
+                                                        {% endif %}
+                                                        {{ match.result }}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ home_team }} Avantajları</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if predictions.analysis.home_advantages %}
+                                        <ul class="list-unstyled mb-0">
+                                            {% for advantage in predictions.analysis.home_advantages %}
+                                                <li><i class="fas fa-check text-success me-2"></i>{{ advantage }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <p class="mb-0">Belirgin bir avantaj bulunamadı</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ away_team }} Avantajları</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if predictions.analysis.away_advantages %}
+                                        <ul class="list-unstyled mb-0">
+                                            {% for advantage in predictions.analysis.away_advantages %}
+                                                <li><i class="fas fa-check text-success me-2"></i>{{ advantage }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <p class="mb-0">Belirgin bir avantaj bulunamadı</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Genel Değerlendirme</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-0">{{ predictions.analysis.conclusion }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
