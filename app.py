@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import os
 from data_preprocessing import get_team_stats, prepare_features
@@ -6,7 +6,7 @@ from model_training import train_models, save_models, load_models, MODELS_DIR
 from prediction_functions import predict_match_result, predict_score, predict_ht_ft, predict_btts
 from prediction import get_team_performance_stats
 
-app = Flask(__name__, template_folder='.')
+app = Flask(__name__)
 
 def init_models():
     """Modelleri yükler veya yeniden eğitir."""
